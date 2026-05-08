@@ -27,3 +27,7 @@ No server, database, or installation is required.
 ## Module
 
 COMP1004 Computing Project — University of Plymouth — 2025/26
+
+## Note
+
+Because of an issue with my GitHub account, I needed to make a new repository and re-upload my code. The commit history is not completely representative of the development process, but the sprint plan in my report explains what work was done in each sprint.
