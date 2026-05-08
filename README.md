@@ -1,6 +1,6 @@
 # Adapti
 
-Adapti is a Single Page Application (SPA) designed to help students manage their academic workload. It automatically prioritises tasks based on deadline urgency and importance rating, so the most critical work always appears first. The app is built using only HTML, CSS, and JavaScript, with `localStorage` used to save user data without needing a server or database.
+Adapti is a Single Page Application (SPA) for managing the academic work of the student. It automatically prioritizes based on the urgency of the task with respect to the deadline, and the rating of the importance. The app has been developed strictly with HTML, CSS and JS, and has no need for a server or database to store user data, thus using localStorage.
 
 ## Features
 
