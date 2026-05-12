@@ -1,4 +1,6 @@
+// app.js
 
+// quotes shown daily on the dashboard
 var QUOTES = [
   { text: "Work hard in silence, let success make the noise.", author: "Frank Ocean" },
   { text: "I've failed over and over again in my life. And that is why I succeed.", author: "Michael Jordan" },
@@ -9,6 +11,7 @@ var QUOTES = [
   { text: "The only way to do great work is to love what you do.", author: "Steve Jobs" }
 ];
 
+// picks a different quote each day using day of year % number of quotes
 function getDailyQuote() {
   var now   = new Date();
   var start = new Date(now.getFullYear(), 0, 0);
@@ -16,18 +19,19 @@ function getDailyQuote() {
   return QUOTES[day % QUOTES.length];
 }
 
-// Timer
+// timer state - kept outside functions so it survives page changes
 var timerSeconds     = 25 * 60;
 var timerRunning     = false;
 var timerInterval    = null;
 var timerSessionName = "Focus Session";
 
-// Calendar
+// calendar state - tracks which month is showing
 var calYear  = new Date().getFullYear();
 var calMonth = new Date().getMonth();
 
 // Data
 
+// reads tasks from localStorage on page load
 function loadData() {
   try {
     var saved = localStorage.getItem("studyData");
@@ -36,6 +40,7 @@ function loadData() {
   return normalizeData({ modules: [{ name: "General", tasks: [] }] });
 }
 
+// writes current tasks to localStorage
 function saveData() {
   localStorage.setItem("studyData", JSON.stringify(data));
 }
@@ -50,10 +55,12 @@ var importBtn = document.getElementById("importBtn");
 var exportBtn = document.getElementById("exportBtn");
 var fileInput = document.getElementById("fileInput");
 
+// import button clicks the hidden file input to open the file picker
 if (importBtn) { importBtn.onclick = function() { fileInput.click(); }; }
 if (fileInput) { fileInput.onchange = importJSON; }
 if (exportBtn) { exportBtn.onclick = exportJSON; }
 
+// re-renders the page every time the URL hash changes
 window.onhashchange = render;
 window.onload = function() {
   if (!location.hash) location.hash = "#dashboard";
@@ -62,6 +69,7 @@ window.onload = function() {
 
 // Router
 
+// reads the URL hash and calls the right render function
 function render() {
   var page = location.hash.replace("#", "") || "dashboard";
   setActiveNav(page);
@@ -72,6 +80,7 @@ function render() {
   else                          renderDashboard();
 }
 
+// adds the active CSS class to the current page nav link
 function setActiveNav(page) {
   var links = document.querySelectorAll(".nav-link");
   for (var i = 0; i < links.length; i++) {
@@ -83,6 +92,7 @@ function setActiveNav(page) {
 
 // Helpers
 
+// validates all task data - fills in missing fields with safe defaults
 function normalizeData(raw) {
   var d = (raw && typeof raw === "object") ? raw : {};
   if (!Array.isArray(d.modules)) d.modules = [];
@@ -106,24 +116,27 @@ function normalizeData(raw) {
   return d;
 }
 
+// generates a unique ID for each task
 function makeId() {
   if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
   return "id-" + Math.random().toString(16).slice(2) + "-" + Date.now().toString(16);
 }
 
+// keeps a number between min and max
 function clamp(n, min, max, fallback) {
   if (!Number.isFinite(n)) return (fallback !== undefined ? fallback : min);
   return Math.min(max, Math.max(min, n));
 }
 
+// only allows the three valid status values
 function validStatus(s) {
   var v = String(s || "").toLowerCase();
   if (v === "not started" || v === "in progress" || v === "completed") return v;
   return "not started";
 }
 
+// replaces dangerous HTML characters to prevent XSS attacks
 function esc(str) {
-  // Escapes special characters to prevent XSS
   return String(str).replace(/[&<>"']/g, function(c) {
     return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
   });
@@ -133,6 +146,7 @@ function setStatus(text) {
   if (statusMsg) statusMsg.textContent = text;
 }
 
+// builds a star rating string e.g. importance 3 = ★★★☆☆
 function makeStars(n) {
   var s = "";
   for (var i = 0; i < n; i++) s += "★";
@@ -142,6 +156,8 @@ function makeStars(n) {
 
 // Priority
 
+// converts days left into an urgency score 1-10
+// overdue=10, today=9, tomorrow=8, within 14 days uses smooth decay formula
 function getUrgencyScore(days) {
   if (days === null) return 1;
   if (days < 0)     return 10;
@@ -151,6 +167,7 @@ function getUrgencyScore(days) {
   return 1;
 }
 
+// calculates final score = importance x urgency, sorts highest first
 function getSortedTasks() {
   var result = [];
   var tasks  = data.modules[0].tasks;
@@ -162,20 +179,24 @@ function getSortedTasks() {
     if      (days !== null && days < 0)  urgencyClass = "urgent";
     else if (days !== null && days <= 3) urgencyClass = "urgent";
     else if (days !== null && days <= 7) urgencyClass = "warn";
+    // completed tasks get 0.1 multiplier so they sink to the bottom
     var score = t.importance * urgency * (t.status === "completed" ? 0.1 : 1);
     result.push({ id: t.id, title: t.title, deadline: t.deadline,
       importance: t.importance, status: t.status,
       days: days, urgencyClass: urgencyClass, score: score });
   }
+  // b.score - a.score = descending order (highest first)
   result.sort(function(a, b) { return b.score - a.score; });
   return result;
 }
 
+// returns days between today and a deadline string
+// built manually to avoid UTC timezone shifting the date by a day in UK
 function daysUntil(dateStr) {
   if (!dateStr) return null;
   var parts = dateStr.split("-").map(Number);
   if (parts.length < 3) return null;
-  var d = new Date(parts[0], parts[1] - 1, parts[2]); // local time to avoid UTC offset
+  var d = new Date(parts[0], parts[1] - 1, parts[2]); // local time not UTC
   if (isNaN(d.getTime())) return null;
   var today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -183,6 +204,7 @@ function daysUntil(dateStr) {
   return Math.round((d - today) / 86400000);
 }
 
+// returns the badge label and colour class for a task card
 function deadlineBadge(days) {
   if (days === null) return { text: "No deadline", cls: "green" };
   if (days < 0)      return { text: "Overdue by " + Math.abs(days) + " day" + (Math.abs(days) === 1 ? "" : "s"), cls: "red" };
@@ -205,10 +227,12 @@ function renderDashboard() {
     if (tasks[i].days !== null && tasks[i].days < 0 && tasks[i].status !== "completed") overdue++;
   }
   var remaining   = total - completed;
+  // prevent divide by zero when no tasks exist
   var progressPct = total > 0 ? Math.round((completed / total) * 100) : 0;
   var quote       = getDailyQuote();
   var h = "";
   h += '<div class="page-title">Dashboard</div>';
+  // builds today's date as a readable string
   var days = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
   var months = ["January","February","March","April","May","June","July","August","September","October","November","December"];
   var now = new Date();
@@ -224,6 +248,7 @@ function renderDashboard() {
   h += "</div>";
   h += '<div class="card"><div class="card-title">Overall Progress</div>';
   h += '<div class="progress-meta"><span>' + progressPct + '% complete</span><span>' + completed + ' / ' + total + ' tasks</span></div>';
+  // width set as inline style so CSS transition animates it
   h += '<div class="progress-track"><div class="progress-fill" style="width:' + progressPct + '%"></div></div></div>';
   h += '<div class="card"><div class="card-title">Your Tasks</div>';
   if (tasks.length === 0) {
@@ -236,11 +261,12 @@ function renderDashboard() {
       var tc = "task-card " + t.urgencyClass;
       if (t.status === "completed") tc += " done";
       h += '<div class="' + tc + '">';
-      h += '<div class="task-name">' + esc(t.title) + "</div>";
+      h += '<div class="task-name">' + esc(t.title) + "</div>"; // esc prevents XSS
       h += '<div class="task-stars">' + makeStars(t.importance) + "</div>";
       h += '<div class="task-deadline">Deadline: ' + (t.deadline || "None set") + "</div>";
       h += '<span class="task-badge ' + b.cls + '">' + b.text + "</span>";
       h += '<div class="task-footer">';
+      // data-id stores the task ID so we know which task to update
       h += '<select class="statusDrop" data-id="' + t.id + '">';
       h += '<option value="not started"' + (t.status === "not started" ? " selected" : "") + ">Not started</option>";
       h += '<option value="in progress"' + (t.status === "in progress" ? " selected" : "") + ">In progress</option>";
@@ -254,6 +280,7 @@ function renderDashboard() {
   h += "</div>";
   app.innerHTML = h;
 
+  // wire up status dropdowns after HTML is on the page
   var drops = document.querySelectorAll(".statusDrop");
   for (var s = 0; s < drops.length; s++) {
     drops[s].addEventListener("change", function() {
@@ -270,6 +297,7 @@ function renderDashboard() {
     });
   }
 
+  // wire up delete buttons after HTML is on the page
   var delBtns = document.querySelectorAll(".del-btn");
   for (var d2 = 0; d2 < delBtns.length; d2++) {
     delBtns[d2].addEventListener("click", function() {
@@ -277,7 +305,7 @@ function renderDashboard() {
       var id = this.dataset.id;
       for (var k = 0; k < data.modules[0].tasks.length; k++) {
         if (data.modules[0].tasks[k].id === id) {
-          data.modules[0].tasks.splice(k, 1);
+          data.modules[0].tasks.splice(k, 1); // removes 1 item at index k
           break;
         }
       }
@@ -292,6 +320,7 @@ function renderDashboard() {
 
 function renderCalendar() {
   data = normalizeData(data);
+  // builds a map of date string -> task titles due that day
   var tasksByDate = {};
   var urgentDates = {};
   for (var i = 0; i < data.modules[0].tasks.length; i++) {
@@ -305,7 +334,9 @@ function renderCalendar() {
   }
   var MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
   var DAYS   = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+  // getDay() returns 0-6 for which day of week the 1st falls on
   var firstDay    = new Date(calYear, calMonth, 1).getDay();
+  // day 0 of next month = last day of this month
   var daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
   var now         = new Date();
   var todayStr    = now.getFullYear() + "-" + String(now.getMonth()+1).padStart(2,"0") + "-" + String(now.getDate()).padStart(2,"0");
@@ -318,6 +349,7 @@ function renderCalendar() {
   h += '<button class="cal-arrow" id="calNext">Next &#8594;</button></div>';
   h += '<div class="cal-grid">';
   for (var dh = 0; dh < 7; dh++) h += '<div class="cal-head">' + DAYS[dh] + "</div>";
+  // empty cells before the 1st of the month
   for (var e = 0; e < firstDay; e++) h += '<div class="cal-cell empty"></div>';
   for (var day = 1; day <= daysInMonth; day++) {
     var ds    = calYear + "-" + String(calMonth+1).padStart(2,"0") + "-" + String(day).padStart(2,"0");
@@ -327,6 +359,7 @@ function renderCalendar() {
     else if (urgentDates[ds])   cls += " urgent";
     else if (tasks.length > 0)  cls += " has-task";
     h += '<div class="' + cls + '"><div class="cal-day-num">' + day + "</div>";
+    // show up to 2 task names inside the cell
     for (var ti = 0; ti < Math.min(tasks.length, 2); ti++) {
       h += '<div class="cal-task-label">' + esc(tasks[ti]) + "</div>";
     }
@@ -340,6 +373,7 @@ function renderCalendar() {
   h += '<div class="legend-row"><div class="legend-box" style="background:#fee2e2;border:1px solid #fca5a5"></div>Urgent (within 3 days)</div>';
   h += "</div></div>";
   app.innerHTML = h;
+  // prev/next buttons change calMonth and re-render
   document.getElementById("calPrev").addEventListener("click", function() {
     calMonth--; if (calMonth < 0) { calMonth = 11; calYear--; } renderCalendar();
   });
@@ -397,6 +431,7 @@ function renderTimer() {
   });
 }
 
+// converts seconds to MM:SS string e.g. 1500 = "25:00"
 function formatTime(secs) {
   var m = Math.floor(secs / 60);
   var s = secs % 60;
@@ -409,7 +444,7 @@ function updateTimerDisplay() {
 }
 
 function startTimer() {
-  if (timerRunning) return;
+  if (timerRunning) return; // stops a second interval starting if pressed twice
   timerRunning = true;
   timerInterval = setInterval(function() {
     if (timerSeconds <= 0) {
@@ -419,12 +454,12 @@ function startTimer() {
     }
     timerSeconds--;
     updateTimerDisplay();
-  }, 1000);
+  }, 1000); // runs every 1000ms = 1 second
 }
 
 function pauseTimer() {
   timerRunning = false;
-  clearInterval(timerInterval);
+  clearInterval(timerInterval); // cancels the interval
   timerInterval = null;
 }
 
@@ -466,7 +501,8 @@ function addTask() {
   var impEl   = document.getElementById("fImportance");
   var statEl  = document.getElementById("fStatus");
   var errEl   = document.getElementById("formErr");
-  var title   = titleEl.value.trim();
+  var title   = titleEl.value.trim(); // trim removes accidental spaces
+  // show inline error instead of alert so it fits the design
   if (!title) { errEl.textContent = "Please enter a task title."; return; }
   errEl.textContent = "";
   data.modules[0].tasks.push({
@@ -478,7 +514,7 @@ function addTask() {
   });
   saveData();
   setStatus("Task added");
-  location.hash = "#dashboard";
+  location.hash = "#dashboard"; // triggers router to go back to dashboard
 }
 
 // About
@@ -502,8 +538,8 @@ async function importJSON(e) {
   var file = e.target.files && e.target.files[0];
   if (!file) return;
   try {
-    var text = await file.text();
-    var json = JSON.parse(text);
+    var text = await file.text(); // await waits for file to be fully read
+    var json = JSON.parse(text);  // converts text back to a JS object
     data = normalizeData(json);
     saveData();
     setStatus("Imported successfully");
@@ -512,16 +548,17 @@ async function importJSON(e) {
     console.error(err);
     alert("Could not read that file. Please check it is valid JSON.");
   } finally {
-    e.target.value = "";
+    e.target.value = ""; // resets input so same file can be imported again
   }
 }
 
 function exportJSON() {
   data = normalizeData(data);
+  // null, 2 adds indentation to the JSON output
   var blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
   var a    = document.createElement("a");
-  a.href   = URL.createObjectURL(blob);
+  a.href   = URL.createObjectURL(blob); // creates a temporary download URL
   a.download = "study-plan.json";
-  a.click();
+  a.click(); // simulates a click to trigger the download
   setStatus("Exported successfully");
 }
